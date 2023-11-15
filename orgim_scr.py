@@ -15,10 +15,13 @@ except:
 
 
 def userGetOrg(study='haglag'):
-    usersetfile = study + '_set_orgin.p'
+    usersetfile = os.getcwd() + f"/{study}_set_orgin.p"
     if os.path.isfile(usersetfile):
         with open(usersetfile, "rb") as fp:
             usersettings = pickle.load(fp)
+    else:
+        print(usersetfile)
+        raise FileNotFoundError
     return usersettings
 
 def print_prm(prm):
