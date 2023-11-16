@@ -70,7 +70,7 @@ plot =1    %  if plot ==1, some results are plotted for illustration
         for i in range(nosl):
             #print(f'i: {i}, cpD: {cpD["X"].shape}, inD: {inD["X"][i].shape}')
             #print(f'i: {i}, cpD: {cpD["X"][i][:,:].shape}, inD: {inD["X"][i][cco:r-cco,cco:c-cco].shape}')
-            cpD['X'][i][:,:]=inD['X'][i][cco:r-cco,cco:c-cco]
+            cpD['X'][i][:,:]=inD['X'][i][cco:r-cco,cco:c-cco] # cco=128, r=c=512 => [128:512-128, 128:512-128]
             if 'Mmyo' in inD:
                 #print(f'cpD keys crop: {cpD.keys()}')
                 cpD['Mmyo'][i][:,:]=inD['Mmyo'][i][cco:r-cco,cco:c-cco]
