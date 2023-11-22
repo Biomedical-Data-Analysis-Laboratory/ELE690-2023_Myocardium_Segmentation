@@ -19,6 +19,24 @@ policy = mixed_precision.Policy('float32')
 mixed_precision.set_global_policy(policy)
 
 class PredictAndVisualizeCallback(Callback):
+    """
+    A callback to visualize predictions of a deep learning model at specified epochs during training.
+
+    This callback is used primarily for visual tasks like image segmentation. It enables the visual comparison of 
+    predicted masks against the ground truth after each specified number of epochs, aiding in the evaluation and 
+    adjustment of the model during training.
+
+    Parameters:
+    model (keras.Model): The model on which predictions are made.
+    test_generator (Generator): A test data generator that yields batches of input and true masks.
+    model_name (str, optional): A name for the model. Defaults to 'test_model'.
+    num_samples (int, optional): Number of samples to visualize per batch. Defaults to 3.
+    interval (int, optional): Interval of epochs at which visualization occurs. Defaults to 1 (every epoch).
+
+    Methods:
+    on_epoch_end(self, epoch, logs=None): Called at the end of each epoch. Visualizes predictions if the 
+    epoch number matches the specified interval. Saves the visualizations to a PNG file.
+    """
     def __init__(self, model, test_generator, model_name='test_model', num_samples=3, interval=1):
         self.model = model
         self.test_generator = test_generator
@@ -43,7 +61,6 @@ class PredictAndVisualizeCallback(Callback):
                 # Get the next batch from the validation generator
                 image_batch, mask_batch = next(self.test_generator)
                 predictions = self.model.predict(image_batch)
-                #sample_indices = np.random.choice(len(image_batch), self.num_samples, replace=False)
 
                 # Loop through the batch and plot individual samples
                 image = image_batch[0]
@@ -87,6 +104,30 @@ def data_generators(input_shape = (256,256,1),
                     seed = 1,
                     augmentation=None,
                     ):
+    """
+    Creates and returns data generators for training, validation, and testing, along with the test dataset and dataset sizes.
+
+    This function initializes data generators with optional data augmentation for deep learning models. It is specifically 
+    tailored for image-based tasks, allowing for the input shape, batch size, and augmentation details to be specified.
+
+    Parameters:
+    input_shape (tuple, optional): Shape of the input images. Defaults to (256, 256, 1).
+    PICKLE_PATH (str, optional): Path to the pickle file containing the dataset. Defaults to 'haglag_imgs_and_Mmyo_0_15_validation.p'.
+    batch_size (int, optional): Number of images per batch. Defaults to 10.
+    seed (int, optional): Seed for random number generation to ensure reproducibility. Defaults to 1.
+    augmentation (dict, optional): Dictionary specifying data augmentation parameters. If None, default augmentation is applied.
+
+    Returns:
+    tuple: A tuple containing the following elements in order:
+           - train_generator: A generator for training data.
+           - validation_generator: A generator for validation data.
+           - test_generator: A generator for test data.
+           - test_set: A tuple containing test images and their corresponding masks.
+           - set_size: A tuple containing the sizes of the training, validation, and test datasets.
+
+    The function works by loading the dataset from a specified pickle file, applying optional data augmentation, and then 
+    creating generators for the training, validation, and test datasets. It is crucial for image segmentation or classification tasks.
+    """
     
     # Load data
     with open(PICKLE_PATH, "rb") as input_file:
@@ -156,7 +197,21 @@ def data_generators(input_shape = (256,256,1),
 
 
 def dice_loss(y_true, y_pred):
+    """
+    Computes the Dice loss, a measure for the similarity of two samples, typically used in image segmentation.
 
+    Parameters:
+    y_true (Tensor): The ground truth labels.
+    y_pred (Tensor): The predicted labels.
+
+    Returns:
+    float: The computed Dice loss, a value between 0 and 1, where lower values indicate better model performance.
+
+    This function calculates the Dice loss, which is 1 minus the Dice coefficient - a statistic used to gauge the similarity 
+    of two sets of data. The Dice coefficient is calculated based on the intersection over the union of the predicted and true 
+    labels, with a smoothing term to avoid division by zero. This loss function is particularly useful for handling 
+    imbalanced datasets in segmentation tasks.
+    """
     def dice_coefficient(y_true, y_pred, smooth=1.0):
         intersection = tf.reduce_sum(tf.math.multiply(y_true,y_pred))
         union = tf.reduce_sum(y_true) + tf.reduce_sum(y_pred)
@@ -165,33 +220,39 @@ def dice_loss(y_true, y_pred):
 
     return 1.0 - dice_coefficient(y_true, y_pred)
 
-# These functions are from A.Kregnes, and have been modified slightly due to the differences in formatting bewteen the projects
-def F1(output, target):
-    npoutput, nptarget = output.astype(bool), target.astype(bool)
-    nptarget = nptarget.flatten()
-    npoutput = npoutput.flatten()
 
-    f1 = f1_score(nptarget, npoutput, average=None)
+def F1(mask, prediction):
+# This function is reworked from C. Cappelen et al. project in 2022.
+    # This function calculates the F1-score of a prediction.
+    # The function expects both prediction and mask to be numpy array of 1 and 0.
+    prediction = prediction.astype(bool).flatten()
+    mask = mask.astype(bool).flatten()
+    f1 = f1_score(mask, prediction, average=None)
     return f1
 
-def jaccard(output, target):
-    npoutput, nptarget = output.astype(bool), target.astype(bool)
+def jaccard(mask, prediction):
+# This function is reworked from C. Cappelen et al. project in 2022.
+    # This function calculates the Jaccard of a prediction.
+    # The function expects both prediction and mask to be numpy array of 1 and 0.
+    mask = mask.astype(bool).flatten()
+    prediction = prediction.astype(bool).flatten()
 
-    intersection = np.logical_and(npoutput, nptarget)
-    union = np.logical_or(npoutput, nptarget)
+    intersection = np.logical_and(mask, prediction)
+    union = np.logical_or(mask, prediction)
     jacc = intersection.sum() / float(union.sum())
     return jacc
 
-def dice(output, target):
-    npoutput, nptarget = output, target
-    npoutput = npoutput.flatten()
-    nptarget = nptarget.flatten()
+def dice(mask, prediction, smooth=1):
+# This function is reworked from C. Cappelen et al. project in 2022.
+    # This function calculates the DSC (Dice Similarity Coefficient) of a prediction.
+    # The function expects both prediction and mask to be numpy array of 1 and 0.
+    mask = mask.astype(bool).flatten()
+    prediction = prediction.astype(bool).flatten()
+    intersection = np.logical_and(mask, prediction)
+    A = np.sum(mask)
+    B = np.sum(prediction)
 
-    intersection = np.logical_and(nptarget, npoutput)
-    A = np.sum(npoutput)
-    B = np.sum(nptarget)
-
-    dice = 2 * (intersection.sum() + 1) / (A + B + 1)
+    dice = 2 * (intersection.sum() + smooth) / (A + B + smooth)
     return dice
 
 def train_model(model, 
@@ -217,13 +278,6 @@ def train_model(model,
 
     Note: The 'train_length' and 'val_length' are used to calculate 'steps_per_epoch' and 'validation_steps' respectively.
     '''
-
-    name = settings['name']
-    control_metric = settings['control_metric']
-    learning_rate = settings['learning_rate']
-    epochs = settings['max_epochs']
-    callbacks = settings['callbacks']
-    metrics = settings['metrics']
     validation_steps = settings['val_length']/settings['batch_size']
     steps_per_epoch = settings['train_length']/settings['batch_size']
 
@@ -234,41 +288,60 @@ def train_model(model,
 
     model.compile(
         optimizer=tf.optimizers.Adam(
-            learning_rate=learning_rate
+            learning_rate=settings['learning_rate']
         ),
         loss=dice_loss, #weighted_bce_dice_loss, #wce(33.1),  #dice_loss,
-        metrics=metrics
+        metrics=settings['metrics']
     )
 
     result = model.fit(
         x = train_generator,
-        epochs = epochs,
+        epochs = settings['max_epochs'],
         steps_per_epoch=steps_per_epoch,
         validation_data = validation_generator,
         validation_steps = validation_steps,
-        callbacks = callbacks
+        callbacks = settings['callbacks']
     )
 
     model_info = {
         'description': 'Training results for the UNet models',
         'dataset': settings['data_set'],
-        'name': name,
+        'name': settings['name'],
         'model': settings['model'],
         'initial_filters': settings['initial_filters'],
         'dropout_rate': settings['dropout_rate'],
-        'control_metric': control_metric,
+        'control_metric': settings['control_metric'],
         'early_stopping': settings['early_stopping'],
         'stopping_patience': settings['patience'],
-        'stopping_epoch': len(result.history[control_metric]),
-        # 'metrics': metrics,
-        'learning_rate': learning_rate,
+        'stopping_epoch': len(result.history[settings['control_metric']]),
+        'learning_rate': settings['learning_rate'],
         'batch_size': settings['batch_size'],
-        'max_epochs': epochs,       
+        'max_epochs': settings['max_epochs'],       
     }
     result.history['info'] = model_info
     return result
 
 def plot_history(history: dict, metrics: list=['accuracy', 'loss'], savepath: str='ModelHistoryPlot.png', title: str='Model training metrics pr epoch'):
+    """
+    Plots the training history of a machine learning model, specifically focusing on two metrics such as accuracy and loss.
+
+    This function takes a history dictionary, typically returned by the training process of a Keras model, and visualizes the 
+    progression of specified metrics over the training epochs. It creates a plot with two subplots, one for each metric.
+
+    Parameters:
+    history (dict): The training history returned by the model's fit method. It should contain records of the metrics over epochs.
+    metrics (list, optional): A list of two metric names to plot. Defaults to ['accuracy', 'loss'].
+    savepath (str, optional): File path where the plot will be saved. Defaults to 'ModelHistoryPlot.png'.
+    title (str, optional): The title of the plot. Defaults to 'Model training metrics pr epoch'.
+
+    Returns:
+    None: The function does not return any value. It saves the plot to the specified path and closes it after saving.
+
+    The function creates a two-subplot figure, plotting the first specified metric and its validation counterpart on one subplot, 
+    and the second metric on the other subplot. It includes legends, labels, and grid lines for clarity. The function also handles 
+    the y-axis limits for the loss plot to ensure the plot is readable and informative. This function is essential for visualizing 
+    model performance over time and diagnosing potential issues like overfitting or underfitting.
+    """
     if len(metrics) != 2:
         print("Can only generate plots for 2 metrics.")
         return
@@ -309,13 +382,31 @@ def plot_history(history: dict, metrics: list=['accuracy', 'loss'], savepath: st
 
     # Adjust space between subplots
     plt.tight_layout()
-
     plt.savefig(savepath)
     plt.close(fig)
 
 
 def pred_and_plot(unet_model, test_set, title='test', save_path=None, random_samples=False):
+# This function is reworked from C. Cappelen et al. project in 2022.
+    """
+    This function applies a trained U-Net model to a test dataset to generate predictions. It then visualizes these predictions 
+    by drawing contours on the original images and predicted masks. The function can either select random samples or use a 
+    predefined set of indices for visualization.
 
+    Parameters:
+    unet_model (Model): The trained U-Net model used for making predictions.
+    test_set (tuple): A tuple containing the test images and their corresponding masks.
+    title (str, optional): Title for the plot showing predicted masks. Defaults to 'test'.
+    save_path (str, optional): Path where the plot will be saved. If None, saves in the current working directory under 'Figures/PredictionPlot.png'.
+    random_samples (bool, optional): If True, selects random samples for visualization; otherwise, uses predefined indices. Defaults to False.
+
+    Returns:
+    None: The function does not return any value. It saves the visualizations to the specified path or the default location.
+
+    The function predicts masks using the given U-Net model and test dataset. It then overlays these masks and the ground truth 
+    masks on the original images, using contours for clear visualization. The visualizations are useful for assessing the model's 
+    performance on specific examples and comparing predicted results with actual data.
+    """
     # Predict using the generator
     preds_test = unet_model.predict(test_set[0], verbose=0)
     preds_test_t = (preds_test > 0.5).astype(np.uint8)
@@ -365,7 +456,31 @@ def pred_and_plot(unet_model, test_set, title='test', save_path=None, random_sam
 
 
 def model_evaluation(model, test_generator, model_name, model_weight, verbose=False):
-    
+# This function is reworked from C. Cappelen et al. project in 2022.
+    """
+    Evaluates a trained model on a test dataset and computes various performance metrics.
+
+    This function applies a trained model to a test generator, collects predictions, and compares them against the true masks 
+    to compute several evaluation metrics. It is particularly useful for models in segmentation tasks, where precise 
+    evaluation is crucial.
+
+    Parameters:
+    model (Model): The trained model to be evaluated.
+    test_generator (Generator): A generator that yields batches of test images and their corresponding masks.
+    model_name (str): Name of the model, used for display purposes.
+    model_weight (str): Identifier for the model's weights, used for display.
+    verbose (bool, optional): If True, prints a detailed performance report. Defaults to False.
+
+    Returns:
+    dict: A dictionary containing the computed precision, recall, specificity, dice coefficient, jaccard index, 
+          F1-score, and a formatted string report of these metrics.
+
+    The function iterates over the provided test generator, collecting predictions and true masks. It stops once a 
+    specified number of images have been processed. The function then computes precision, recall, specificity, dice 
+    coefficient, jaccard index, and F1-score for the predictions. If verbose is True, it prints a detailed report 
+    including the model name and weight identifier. This function is essential for quantitatively assessing the 
+    performance of segmentation models, providing a comprehensive view of model accuracy and reliability.
+    """
     all_preds = []
     all_masks = []
 
@@ -407,8 +522,8 @@ F1-score:       {prediction_eval['f1']}
     prediction_eval['report'] = prediction_result
     return prediction_eval
 
-# for use when json.dump with non serializable numpy arrays
 def default(o):
+# for use with json.dump with non serializable numpy arrays
     if isinstance(o, np.ndarray):
         return o.tolist()  # Convert numpy array to list
     raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
@@ -502,115 +617,116 @@ def pred_patient_set(model_path, test_set, model_name='Test_model', save_path=No
 
 
 if __name__ == '__main__':
-    train_generator, validation_generator, test_generator, test_set, set_size = data_generators()
+    pass
+    # train_generator, validation_generator, test_generator, test_set, set_size = data_generators()
 
-    model = UnetModels.unet_standard(INPUT_SHAPE, 16, 0.2)
+    # model = UnetModels.unet_standard(INPUT_SHAPE, 16, 0.2)
 
-    model_name = 'UNet_Segmentation_Model_Test'
-    model_type = 'Standard'
-    model_training_set = 'haglag_imgs_and_Mmyo_0_15_validation.p'
-    early_stopping_patience = 25
-    model_folder = f"Models/{model_type}/{model_name}/"
-    model_batch_size = 10
-    learning_rate = 5e-5
+    # model_name = 'UNet_Segmentation_Model_Test'
+    # model_type = 'Standard'
+    # model_training_set = 'haglag_imgs_and_Mmyo_0_15_validation.p'
+    # early_stopping_patience = 25
+    # model_folder = f"Models/{model_type}/{model_name}/"
+    # model_batch_size = 10
+    # learning_rate = 5e-5
 
-    settings_example = {
-        'name': model_name,
-        'folder': model_folder,
-        'control_metric': 'val_iou_pos',
-        'learning_rate': learning_rate,
-        'max_epochs': 101,
-        'batch_size': model_batch_size,
-        'callbacks': [
-            EarlyStopping(monitor='val_iou_pos', 
-                            mode='max', 
-                            patience=early_stopping_patience, 
-                            restore_best_weights=True,
-                            verbose=1,
-                            ),
-            ModelCheckpoint(model_folder+'best_model_val_loss.h5',
-                            monitor='val_loss', 
-                            mode='min', 
-                            save_best_only=True,
-                            verbose=1,
-                            ),
-            ModelCheckpoint(model_folder + 'best_model_val_iou.h5',
-                            monitor='val_iou_pos', 
-                            mode='max', 
-                            save_best_only=True,
-                            verbose=1,
-                            ),
-            ModelCheckpoint(model_folder + 'best_model_precision.h5',
-                            monitor='val_precision', 
-                            mode='max', 
-                            save_best_only=True,
-                            verbose=1,
-                            ),
-            ModelCheckpoint(model_folder + 'best_model_recall.h5',
-                            monitor='val_recall', 
-                            mode='max', 
-                            save_best_only=True,
-                            verbose=1,
-                            ),
-            ModelCheckpoint(model_folder + 'best_model_accuracy.h5',
-                            monitor='val_accuracy', 
-                            mode='max', 
-                            save_best_only=True,
-                            verbose=1,
-                            ),
-            PredictAndVisualizeCallback(model, 
-                            test_generator, 
-                            model_folder + 'test', 
-                            interval=10)
-        ],
-        'metrics': ['accuracy',
-                    Precision(name='precision'),
-                    Recall(name='recall'),
-                    IoU(num_classes=2, name='iou_neg', target_class_ids=[0]),
-                    IoU(num_classes=2, name='iou_pos', target_class_ids=[1])
-                    ],
-        'val_length': 74,  
-        'train_length': 273, 
-        'test_lengtg': 117,
-        'training_set': model_training_set,
-        'model': model_type,
-        'early_stopping': f'Enabled with patience {early_stopping_patience}',
-        'patience': early_stopping_patience,
-        }
+    # settings_example = {
+    #     'name': model_name,
+    #     'folder': model_folder,
+    #     'control_metric': 'val_iou_pos',
+    #     'learning_rate': learning_rate,
+    #     'max_epochs': 101,
+    #     'batch_size': model_batch_size,
+    #     'callbacks': [
+    #         EarlyStopping(monitor='val_iou_pos', 
+    #                         mode='max', 
+    #                         patience=early_stopping_patience, 
+    #                         restore_best_weights=True,
+    #                         verbose=1,
+    #                         ),
+    #         ModelCheckpoint(model_folder+'best_model_val_loss.h5',
+    #                         monitor='val_loss', 
+    #                         mode='min', 
+    #                         save_best_only=True,
+    #                         verbose=1,
+    #                         ),
+    #         ModelCheckpoint(model_folder + 'best_model_val_iou.h5',
+    #                         monitor='val_iou_pos', 
+    #                         mode='max', 
+    #                         save_best_only=True,
+    #                         verbose=1,
+    #                         ),
+    #         ModelCheckpoint(model_folder + 'best_model_precision.h5',
+    #                         monitor='val_precision', 
+    #                         mode='max', 
+    #                         save_best_only=True,
+    #                         verbose=1,
+    #                         ),
+    #         ModelCheckpoint(model_folder + 'best_model_recall.h5',
+    #                         monitor='val_recall', 
+    #                         mode='max', 
+    #                         save_best_only=True,
+    #                         verbose=1,
+    #                         ),
+    #         ModelCheckpoint(model_folder + 'best_model_accuracy.h5',
+    #                         monitor='val_accuracy', 
+    #                         mode='max', 
+    #                         save_best_only=True,
+    #                         verbose=1,
+    #                         ),
+    #         PredictAndVisualizeCallback(model, 
+    #                         test_generator, 
+    #                         model_folder + 'test', 
+    #                         interval=10)
+    #     ],
+    #     'metrics': ['accuracy',
+    #                 Precision(name='precision'),
+    #                 Recall(name='recall'),
+    #                 IoU(num_classes=2, name='iou_neg', target_class_ids=[0]),
+    #                 IoU(num_classes=2, name='iou_pos', target_class_ids=[1])
+    #                 ],
+    #     'val_length': 74,  
+    #     'train_length': 273, 
+    #     'test_lengtg': 117,
+    #     'training_set': model_training_set,
+    #     'model': model_type,
+    #     'early_stopping': f'Enabled with patience {early_stopping_patience}',
+    #     'patience': early_stopping_patience,
+    #     }
 
     
 
-    result = train_model(model=model,
-                         train_generator=train_generator,
-                         validation_generator=validation_generator,
-                         settings=settings_example)
-    with open(model_folder+"history.json", 'w') as f:
-        json.dump(result.history, f, indent=4)
+    # result = train_model(model=model,
+    #                      train_generator=train_generator,
+    #                      validation_generator=validation_generator,
+    #                      settings=settings_example)
+    # with open(model_folder+"history.json", 'w') as f:
+    #     json.dump(result.history, f, indent=4)
     
-    # print(result.history['info'])
+    # # print(result.history['info'])
 
-    best_models = [file for file in os.listdir(model_folder) if file.endswith('.h5')]
-    print(best_models)
-    eval_summary = ''
-    eval_json = dict()
-    for m in best_models:
-        print('Evaluating', m)
-        model = load_model(model_folder+m, custom_objects={'dice_loss': dice_loss, 'PredictAndVisualizeCallback': PredictAndVisualizeCallback})
+    # best_models = [file for file in os.listdir(model_folder) if file.endswith('.h5')]
+    # print(best_models)
+    # eval_summary = ''
+    # eval_json = dict()
+    # for m in best_models:
+    #     print('Evaluating', m)
+    #     model = load_model(model_folder+m, custom_objects={'dice_loss': dice_loss, 'PredictAndVisualizeCallback': PredictAndVisualizeCallback})
         
-        pred_and_plot(model, test_set, 'test', model_folder+m[:-3]+'_PredPlot.png')
+    #     pred_and_plot(model, test_set, 'test', model_folder+m[:-3]+'_PredPlot.png')
         
-        model_eval = model_evaluation(model, test_generator, model_name, m)
-        eval_summary+= model_eval['report'] + '\n\n'
-        eval_json[m] = model_eval
+    #     model_eval = model_evaluation(model, test_generator, model_name, m)
+    #     eval_summary+= model_eval['report'] + '\n\n'
+    #     eval_json[m] = model_eval
 
 
     
-    with open(model_folder+'EvaluationMetrics.txt', 'w') as f:
-        f.write(eval_summary)
+    # with open(model_folder+'EvaluationMetrics.txt', 'w') as f:
+    #     f.write(eval_summary)
 
-    # print(eval_json)
-    with open(model_folder+'evaluation.json', 'w') as j:
-        json.dump(eval_json, j, default=default, indent=4)
+    # # print(eval_json)
+    # with open(model_folder+'evaluation.json', 'w') as j:
+    #     json.dump(eval_json, j, default=default, indent=4)
 
 
 
