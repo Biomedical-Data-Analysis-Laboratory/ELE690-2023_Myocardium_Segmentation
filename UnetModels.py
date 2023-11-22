@@ -156,8 +156,10 @@ def unet_with_residuals(input_shape, num_classes=1, initial_filters=64, l2_stren
 
 
 ##################################################
-############## MultiRes UNet Modek ###############
+############## MultiRes UNet Model ###############
 ##################################################
+
+# Code from https://github.com/nibtehaz/MultiResUNet
 
 def conv2d_bn(x, filters, num_row, num_col, padding='same', strides=(1, 1), activation='relu', name=None):
     '''
