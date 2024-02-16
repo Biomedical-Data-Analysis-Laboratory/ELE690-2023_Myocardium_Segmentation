@@ -597,14 +597,14 @@ def pred_patient_set(model_path, test_set, model_name='Test_model', save_path=No
             # Calculate Jaccard and Dice of predicted image
             prediction =    np.concatenate(preds[i].copy()).astype(np.bool_).flatten()
             mask =          np.concatenate(masks[i].copy()).astype(np.bool_).flatten()
-            jaccard =       round(jaccard(prediction, mask), 3)
-            dice =          round(dice(prediction, mask), 3)
-            patient_metrics.setdefault("jaccard", []).append(jaccard)
-            patient_metrics.setdefault("dice", []).append(dice)
+            jaccar =       round(jaccard(prediction, mask), 3)
+            dic =          round(dice(prediction, mask), 3)
+            patient_metrics.setdefault("jaccard", []).append(jaccar)
+            patient_metrics.setdefault("dice", []).append(dic)
             
             # Generate subplots and insert images
             plt.subplot(rows, 4, i+1)
-            plt.xlabel(f"Image {i} | DSC: {dice} | Jaccard: {jaccard}", fontsize=20)
+            plt.xlabel(f"Image {i} | DSC: {dic} | Jaccard: {jaccar}", fontsize=20)
             plt.imshow(img_pred_cont)
             
         fig.text(0.5, 0.98, f"Prediction series of test patient #{patient_number}", ha='center', va='center', fontsize=40)

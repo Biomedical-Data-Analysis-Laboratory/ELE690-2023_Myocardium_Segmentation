@@ -1,5 +1,8 @@
-import sys, os
-sys.path.append('CardioMiner')
+import sys, os, getopt
+if os.environ.get('OS','') == 'Windows_NT':
+    sys.path.append('c:/projects/python/mriprog/CardioMiner')
+else:
+    sys.path.append('~/projects/python/mriprog/CardioMiner')
 import numpy as np
 from CropHeart import crop_heart
 import pickle as p 
@@ -19,92 +22,142 @@ def nest_flatten(nested_list: list[list]) -> list:
     """
     return [element for sublist in nested_list for element in sublist]
 
-dataset = 'haglag'
-delineation_location = {'haglag':'konsensus_leik_stein', 'vxvy':'erlend'}
+def main(argv):
+    dat, epi, vrb, dbg = arg_read(argv)
+    dataset = dat
 
-filepath = '/home/prosjekt5/EKG/data/wmri/'
-filepathDel = f'/home/prosjekt5/EKG/data/wmri/{delineation_location.get(dataset)}/'
+    delineation_location = {'haglag':'konsensus_leik_stein', 'vxvy':'erlend', 'PM':'erlend'}
 
-prm = oi.userGetOrg(dataset) # Sets the user settings for the organization function within 0i.main()
-prm['filepath'] = filepath # filepath must be changed to match the path to data.
-prm['filepathDel'] = filepathDel 
+    dbdir = {'haglag':'wmri', 'vxvy':'wmri', 'PM':'mri/PM'}
+    
+    if os.environ.get('OS','') == 'Windows_NT':
+        filepath = f'P:/data/{dbdir.get(dataset)}/'
+        filepathDel = f'P:/data/{dbdir.get(dataset)}/{delineation_location.get(dataset)}/'
+    else:
+        filepath = f'/home/prosjekt5/EKG/data/{dbdir.get(dataset)}/'
+        filepathDel = f'/home/prosjekt5/EKG/data/{dbdir.get(dataset)}/{delineation_location.get(dataset)}/'
 
-print(prm.keys())
-patients_with_delineation = [var for var in prm['Ptsgm'] if var] # Make a list of all the patients that have a deliniation
-#print(List)
-ids = []    # patient ID
-imgs = []   # images
-Mmyo = []   # Mask of myocardium
-with open('log.txt', mode='w', encoding='utf-8') as log:
-    start = time.perf_counter()
-    print('starting')
-    for i, patient in enumerate(patients_with_delineation):
-        #print(f'#{i}, patient id: {patient}')
-        try: 
-            inD, b, prm_h, Pt_h = oi.main(dataset, patient) # Extract the info into inD. It contains pictures, delineations etc. 
-        except Exception as e:
-            log.write(f'#{i}: {patient}, oi.main(), {repr(e)}\n')
-            print(f'failed at #{i} oi.main()')
-            continue
-        #print(inD.keys())
-        try:
-            cpD = crop_heart(inD, plot=0) # Crops the image of the heart to zoom more onto the myocard
-        except Exception as e:
-            log.write(f'{i}, {patient}, crop_heart(), {repr(e)}\n')
-            print(f'failed at #{i} crop_heart()')
-            continue
-        cpD['id'] = patient
-        ids.append(cpD['id'])
-        imgs.append(cpD['X'])
-        Mmyo.append(cpD['Mmyo'])
-finish = time.perf_counter()
-print(f'time: {(finish-start)//60} min, {round(((finish-start)/60-(finish-start)//60)*60, 2)} s')
-imgs = np.asarray(imgs, dtype=object)
-Mmyo = np.asarray(Mmyo, dtype=object)
+    prm = oi.userGetOrg(dataset) # Sets the user settings for the organization function within 0i.main()
+    prm['filepath'] = filepath # filepath must be changed to match the path to data.
+    prm['filepathDel'] = filepathDel 
 
-
-# Write dataset presplit to file
-with open(f"{dataset}_presplit.p", 'wb') as f:
-    fdata = dict(
-        images = imgs,
-        masks = Mmyo,
-        ids = ids,
-    )
-    p.dump(fdata, f, protocol=p.HIGHEST_PROTOCOL)
-
-
-# Split dataset into training, validation and test sets
-train_imgs, test_imgs, train_Mmyo, test_Mmyo, train_id, test_id = train_test_split(imgs, Mmyo, ids, test_size=0.25, train_size=0.75,random_state=1)
-train_imgs, val_imgs, train_Mmyo, val_Mmyo, train_id, val_id = train_test_split(train_imgs, train_Mmyo, train_id, test_size=0.2, train_size=0.80, random_state=1)
+    print(prm.keys())
+    patients_with_delineation = [var for var in prm['Ptsgm'] if var] # Make a list of all the patients that have a deliniation
+    #print(List)
+    ids = []    # patient ID
+    imgs = []   # images
+    Mmyo = []   # Mask of myocardium
+    with open('log.txt', mode='w', encoding='utf-8') as log:
+        start = time.perf_counter()
+        print('starting')
+        if epi:
+            patients_with_delineation = patients_with_delineation[epi:]
+        for i, patient in enumerate(patients_with_delineation):
+            print(f'#{i}:{len(patients_with_delineation)}, patient id: {patient}')
+            try: 
+                inD, b, prm_h, Pt_h = oi.main(dataset, patient, prm) # Extract the info into inD. It contains pictures, delineations etc. 
+            except Exception as e:
+                log.write(f'#{i}: {patient}, oi.main(), {repr(e)}\n')
+                print(f'failed at #{i} oi.main()')
+                continue
+            #print(inD.keys())
+            try:
+                cpD = crop_heart(inD, plot=0) # Crops the image of the heart to zoom more onto the myocard
+            except Exception as e:
+                log.write(f'{i}, {patient}, crop_heart(), {repr(e)}\n')
+                print(f'failed at #{i} crop_heart()')
+                continue
+            cpD['id'] = patient
+            ids.append(cpD['id'])
+            imgs.append(cpD['X'])
+            Mmyo.append(cpD['Mmyo'])
+    finish = time.perf_counter()
+    print(f'time: {(finish-start)//60} min, {round(((finish-start)/60-(finish-start)//60)*60, 2)} s')
+    imgs = np.asarray(imgs, dtype=object)
+    Mmyo = np.asarray(Mmyo, dtype=object)
 
 
-# Create a separate test set file where the patient images are kept grouped.
-# This is used to visualy evaluate the models in 'model_training_and_eval.py'.pred_patient_set by
-# predicting on a whole image series of a single patient.
-with open(f"{dataset}_test_patients_0_15_grouped.p", 'wb') as f:
-    test_patients = dict()
-    for i, test_patient in enumerate(test_id):
-        test_patients[test_patient] = [
-            test_imgs[i],
-            test_Mmyo[i],
-        ]
-    p.dump(test_patients, f, protocol=p.HIGHEST_PROTOCOL)
+    # Write dataset presplit to file
+    with open(f"{dataset}_presplit.p", 'wb') as f:
+        fdata = dict(
+            images = imgs,
+            masks = Mmyo,
+            ids = ids,
+        )
+        p.dump(fdata, f, protocol=p.HIGHEST_PROTOCOL)
 
 
-# Create the main training, val and test set file. 
-# Could potentially use a rework because of the move to ImageDataGenerator from
-# tensorflow.keras.preprocessing.image
-with open(f'{dataset}_imgs_and_Mmyo_0_15_validation.p', 'wb') as data_file:
-    train_imgs = np.asarray(nest_flatten(train_imgs))
-    train_Mmyo = np.asarray(nest_flatten(train_Mmyo))
+    # Split dataset into training, validation and test sets
+    train_imgs, test_imgs, train_Mmyo, test_Mmyo, train_id, test_id = train_test_split(imgs, Mmyo, ids, test_size=0.25, train_size=0.75,random_state=1)
+    train_imgs, val_imgs, train_Mmyo, val_Mmyo, train_id, val_id = train_test_split(train_imgs, train_Mmyo, train_id, test_size=0.2, train_size=0.80, random_state=1)
 
-    test_imgs = np.asarray(nest_flatten(test_imgs))
-    test_Mmyo = np.asarray(nest_flatten(test_Mmyo))
 
-    val_imgs = np.asarray(nest_flatten(val_imgs))
-    val_Mmyo = np.asarray(nest_flatten(val_Mmyo))
+    # Create a separate test set file where the patient images are kept grouped.
+    # This is used to visualy evaluate the models in 'model_training_and_eval.py'.pred_patient_set by
+    # predicting on a whole image series of a single patient.
+    with open(f"{dataset}_test_patients_0_15_grouped.p", 'wb') as f:
+        test_patients = dict()
+        for i, test_patient in enumerate(test_id):
+            test_patients[test_patient] = [
+                test_imgs[i],
+                test_Mmyo[i],
+            ]
+        p.dump(test_patients, f, protocol=p.HIGHEST_PROTOCOL)
 
-    id_dict = {'full':ids, 'train':train_id, 'test':test_id, 'val':val_id}
-    data_dict = {'train images':train_imgs,'train Mmyo':train_Mmyo, 'test images':test_imgs, 'test Mmyo':test_Mmyo, 'validation images':val_imgs, 'validation Mmyo':val_Mmyo, 'id':id_dict}
 
-    p.dump(data_dict, data_file, protocol=p.HIGHEST_PROTOCOL)
+    # Create the main training, val and test set file. 
+    # Could potentially use a rework because of the move to ImageDataGenerator from
+    # tensorflow.keras.preprocessing.image
+    with open(f'{dataset}_imgs_and_Mmyo_0_15_validation.p', 'wb') as data_file:
+        train_imgs = np.asarray(nest_flatten(train_imgs))
+        train_Mmyo = np.asarray(nest_flatten(train_Mmyo))
+
+        test_imgs = np.asarray(nest_flatten(test_imgs))
+        test_Mmyo = np.asarray(nest_flatten(test_Mmyo))
+
+        val_imgs = np.asarray(nest_flatten(val_imgs))
+        val_Mmyo = np.asarray(nest_flatten(val_Mmyo))
+
+        id_dict = {'full':ids, 'train':train_id, 'test':test_id, 'val':val_id}
+        data_dict = {'train images':train_imgs,'train Mmyo':train_Mmyo, 'test images':test_imgs, 'test Mmyo':test_Mmyo, 'validation images':val_imgs, 'validation Mmyo':val_Mmyo, 'id':id_dict}
+
+        p.dump(data_dict, data_file, protocol=p.HIGHEST_PROTOCOL)
+
+
+
+
+def arg_read(argv):
+
+    dat = 'haglag'  # experiment number
+    epi = None
+    vrb = 0
+    dbg = False
+
+    try:
+        argv_msg = 'get_images_and_masks.py -d <dat> -e <epi> -v <vrb> -d <dbg>'
+        opts, args = getopt.getopt(argv, "hd:e:v:d:",
+                                   ["dat", "epi", "vrb", "dbg"])
+    except getopt.GetoptError:
+        print(argv_msg)
+        sys.exit(2)
+    for opt, arg in opts:
+        if arg in ['T', 't']:
+            arg = 'True'
+        if arg in ['F', 'f']:
+            arg = 'False'
+        if opt == '-h':
+            print(argv_msg)
+            sys.exit()
+        elif opt in ("-d", "--dataset"):
+            dat = arg
+        elif opt in ("-e", "--episode"):
+            epi = int(arg)
+        elif opt in ("-v", "--verbose"):
+            vrb = int(arg)
+        elif opt in ("-d", "--dbg"):
+            dbg = eval(arg)
+    return dat, epi, vrb, dbg
+
+        
+if __name__ == "__main__":
+    main(sys.argv[1:])

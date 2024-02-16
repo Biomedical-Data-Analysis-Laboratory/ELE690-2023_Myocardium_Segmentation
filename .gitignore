@@ -1,0 +1,6 @@
+/__pycache__/
+/best_model_multires.h5
+/best_model_residual.h5
+/log.txt
+/pred_patient_set_tips.txt
+/requirements_win.txt

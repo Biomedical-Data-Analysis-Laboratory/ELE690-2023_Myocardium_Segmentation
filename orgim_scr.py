@@ -46,7 +46,25 @@ def print_prm(prm):
             s = s + ' = ' + str(type(prm[keys[k]]))
         print(s)
 
-def main(study='haglag', PtID='AEA063'):
+def main(study='haglag', PtID='AEA063', prm=None):
+    if not prm:
+        prm = userGetOrg(study)
+        prm['filepath'] = '/home/prosjekt5/EKG/data/wmri/'
+        if study =='haglag':
+            prm['filepathDel'] = '/home/prosjekt5/EKG/data/wmri/konsensus_leik_stein/'
+        elif study == 'vxvy':
+            prm['filepathDel'] = '/home/prosjekt5/EKG/data/wmri/erlend/'
+        elif study == 'PM':
+            prm['filepath'] = '/home/prosjekt5/EKG/data/mri/PM/'
+            prm['filepathDel'] = '/home/prosjekt5/EKG/data/mri/PM/erlend/'
+    inD, b = orgin.organizeimage_TE(prm['filepath'],
+                                    prm['filepathDel'],
+                                    PtID,
+                                    prm)
+    Pt = [nm for nm in prm['Ptsgm'] if nm!='']
+    return inD, b, prm, Pt
+        
+def main_old(study='haglag', PtID='AEA063'):
     prm = userGetOrg(study)
     prm['filepath'] = '/home/prosjekt5/EKG/data/wmri/'
     if study =='haglag':
