@@ -12,10 +12,17 @@ modified by T. R. Choat. Modifications in this fork by T. Eftestøl.
 
 
 ### File Descriptions
-- **myosegm.ipynb**: Jupyter notebook
+- **myosegm.ipynb**: Jupyter notebook demonstrating loading data and
+  segmenting images.  Requires pretrained models
+  [best_model_multires.h5](https://github.com/OttoNessaLjosdal/ELE690-2023_Myocardium_Segmentation/blob/main/best_model_multires.h5)
+  and
+  [best_model_residual.h5](https://github.com/OttoNessaLjosdal/ELE690-2023_Myocardium_Segmentation/blob/main/best_model_residual.h5)
+  from the GitHub repository [ELE690-2023_Myocardium_Segmentation](https://github.com/OttoNessaLjosdal/ELE690-2023_Myocardium_Segmentation).
 - **UnetModels.py**: Contains the definitions of various U-Net architectures for image segmentation. Standard, Residual(Modified) and MultiRes Model.
 - **model_training_and_eval.py**: Handles the training and evaluation of models. Includes functions for data preprocessing, model training, and performance evaluation, as well as callback functions, loss functions and more.
-- **grid_training.py**: Orchestrates the training process, potentially over various configurations or hyperparameters.
+- **grid_training.py**: Orchestrates the training process, potentially
+  over various configurations or hyperparameters.
+
 
 ## Prerequisites
 - Python 3.10
