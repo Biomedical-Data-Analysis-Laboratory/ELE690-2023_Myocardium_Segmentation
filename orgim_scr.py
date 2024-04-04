@@ -1,6 +1,7 @@
 import os
 import pickle
-import numpy
+import numpy as np
+import pydicom
 import organizeimage_TE as orgin
 
 """ fr = "Ipython"
@@ -24,6 +25,34 @@ def userGetOrg(study='haglag'):
         raise FileNotFoundError
     return usersettings
 
+def ptidx(prm,p):
+    idx = [i for i in range(len(prm['PDLink'])) if prm['Pt'][p] == prm['PDLink'][i]]
+    return idx
+
+def maxval(prm, k, vrb=False):
+    if prm['stud'] == 'haglag2':
+        drecs = prm['drecs'][k]
+    elif prm['stud'] == 'PM':
+        drecs = np.ndarray.tolist(prm['drecs'][k])
+    dcmf = os.path.join(prm['filepath'],drecs).replace('\\','/')
+    #print(dcmf)
+    ds = pydicom.dcmread(dcmf)
+    img = pydicom.read_file(dcmf)
+    r, c = img.pixel_array.shape
+    imx = np.max(img.pixel_array)
+    #print(ds.BitsStored)
+    mv = 2**ds.BitsStored-1
+    ba = ds.BitsAllocated
+    bs = ds.BitsStored
+    hb = ds.HighBit
+    
+    if vrb:
+        print(f'Size {r}x{c} SamplesperPixel {ds.SamplesPerPixel}, Max pixel value {imx}')
+        
+    #print(2**ds.BitsStored-1)
+
+    return r, c, bs, hb, imx, img
+
 def print_prm(prm):
     keys = [*prm.keys()]
     for k in range(0,len(keys)):
@@ -40,7 +69,7 @@ def print_prm(prm):
             s = s + ' = ' + prm[keys[k]]
         elif type(prm[keys[k]]) is list:
             s = s + ' = ' + str(prm[keys[k]][0:10]) + '(' + str(len(prm[keys[k]])) + ' elements)'
-        elif type(prm[keys[k]]) is numpy.ndarray:
+        elif type(prm[keys[k]]) is np.ndarray:
             s = s + ' = ' + str(prm[keys[k]][0:10]) + '(' + str(len(prm[keys[k]])) + ' elements)'
         else:
             s = s + ' = ' + str(type(prm[keys[k]]))
