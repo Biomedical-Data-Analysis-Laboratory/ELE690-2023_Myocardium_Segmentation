@@ -19,27 +19,34 @@ def userGetOrg(study='haglag'):
     usersetfile = os.getcwd() + f"/{study}_set_orgin.p"
     if os.path.isfile(usersetfile):
         with open(usersetfile, "rb") as fp:
-            usersettings = pickle.load(fp)
+            prm = pickle.load(fp)
+        if type(prm['drecs'][0]) == np.ndarray:
+            prm['drecs'] = [np.ndarray.tolist(d) for d in prm['drecs'] if type(d) == np.ndarray]
     else:
         print(usersetfile)
         raise FileNotFoundError
-    return usersettings
+    return prm
 
 def ptidx(prm,p):
-    idx = [i for i in range(len(prm['PDLink'])) if prm['Pt'][p] == prm['PDLink'][i]]
+    # Get drecs indexes for a given patient (p is name or number)
+    if type(p) == int:
+        idx = [i for i in range(len(prm['PDLink'])) if prm['Pt'][p] == prm['PDLink'][i]]
+    elif type(p) == str:
+        Pt = p
+        idx = [i for i in range(len(prm['PDLink'])) if Pt == prm['PDLink'][i]]
     return idx
 
 def maxval(prm, k, vrb=False):
-    if prm['stud'] == 'haglag2':
-        drecs = prm['drecs'][k]
-    elif prm['stud'] == 'PM':
-        drecs = np.ndarray.tolist(prm['drecs'][k])
+    # Get pixel value information from kth drecs entry
+    drecs = prm['drecs'][k]
     dcmf = os.path.join(prm['filepath'],drecs).replace('\\','/')
     #print(dcmf)
     ds = pydicom.dcmread(dcmf)
     img = pydicom.read_file(dcmf)
+    
     r, c = img.pixel_array.shape
     imx = np.max(img.pixel_array)
+    imx_n = imx*float(ds.RescaleSlope) + float(ds.RescaleIntercept)
     #print(ds.BitsStored)
     mv = 2**ds.BitsStored-1
     ba = ds.BitsAllocated
@@ -51,7 +58,66 @@ def maxval(prm, k, vrb=False):
         
     #print(2**ds.BitsStored-1)
 
-    return r, c, bs, hb, imx, img
+    return r, c, bs, hb, imx, imx_n, img 
+
+def get_pixvalinfo(prm, ld=False, vrb=False):
+    infofile = os.getcwd() + f'/{prm["stud"]}_valinfo.p'
+    if os.path.isfile(infofile) and ld:
+        with open(infofile, "rb") as fp:
+            S = pickle.load(fp)
+    else:
+        S = {'Pt': [], 'min': [], 'max': [], 'slices': []}
+        
+        Np = len(prm['Pt'])
+        for p in range(Np):
+            if vrb:
+                print(f'\n{p+1}:{len(prm["Pt"])} {prm["Pt"][p]}')
+            #print(prm["Pt"][p])
+            idx = ptidx(prm,p)
+            files = [prm['drecs'][i].replace('\\','/') for i in idx]
+            MV = [] # rows
+            BA = [] # columns
+            BS = []
+            HB = []
+            IM = []
+            IM_n = []
+            S2 = {}
+            for k in idx:
+                mv, ba, bs, hb, imx, imx_n, img = maxval(prm,k)
+                MV.append(mv)
+                BA.append(ba)
+                BS.append(bs)
+                HB.append(hb)
+                IM.append(imx)
+                IM_n.append(imx_n)
+            rows = np.unique(MV)
+            cols = np.unique(BA)
+            bs = np.unique(BS)
+            hb = np.unique(HB)
+            im = np.unique(IM)
+            im_n = np.unique(IM_n)
+            S['Pt'].append(prm['Pt'][p])
+            S2[prm['Pt'][p]] = {'file': files, 'max': IM, \
+                                'max_n': IM_n, 'bits_stored': BS}            
+            
+            if len(im) > 0:
+                S['min'].append(np.min(im))
+                S['max'].append(np.max(im))
+            else:
+                S['min'].append(np.nan)
+                S['max'].append(np.nan)
+            S['slices'].append(S2)
+            #print(S)
+            if vrb:
+                try:
+                    print(f'   Size {rows}x{cols} Pixel range {np.min(im)}-{np.max(im)} (normalised {np.min(im_n):.0f}-{np.max(im_n):.0f})')
+                except:
+                    print('Not printable')
+
+        with open(infofile, "wb") as fp:
+            pickle.dump(S,fp)
+            
+    return S
 
 def print_prm(prm):
     keys = [*prm.keys()]

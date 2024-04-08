@@ -563,7 +563,7 @@ def pred_patient_set(model_path, test_set, model_name='Test_model', save_path=No
             'PredictAndVisualizeCallback': PredictAndVisualizeCallback
             }
     )
-
+    PMet = {}
     for patient_number, patient_id in enumerate(test_set.keys()):
         print(f"Predicting with {model_name} on {patient_id}")
         imgs, masks = test_set[patient_id]
@@ -614,6 +614,8 @@ def pred_patient_set(model_path, test_set, model_name='Test_model', save_path=No
         plt.tight_layout(h_pad=1.0, rect=[0, 0.03, 1, 1-0.03*rows])
         plt.savefig(os.path.join(save_path, f"Pred_{patient_id}.png"))
         plt.close(fig)
+        PMet[patient_id] = patient_metrics
+    return PMet
 
 
 if __name__ == '__main__':
