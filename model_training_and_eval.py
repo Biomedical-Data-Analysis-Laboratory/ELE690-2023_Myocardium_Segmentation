@@ -1,6 +1,7 @@
 import pickle 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import cv2, os, json
 import tensorflow as tf
 from sklearn.metrics import f1_score
@@ -98,6 +99,8 @@ IMG_CHANNELS = 1
 INPUT_SHAPE = (IMG_WIDTH,IMG_HEIGHT,IMG_CHANNELS)
 PICKLE_PATH = 'haglag_imgs_and_Mmyo_0_15_validation.p'
 
+# df_pix = pd.read_pickle('df_pix.p')
+
 def data_generators(input_shape = (256,256,1),
                     PICKLE_PATH = 'haglag_imgs_and_Mmyo_0_15_validation.p',
                     batch_size = 10,
@@ -135,7 +138,7 @@ def data_generators(input_shape = (256,256,1),
     _ids = data.pop("id")
     for (key, value) in data.items():
         number, height, width = value.shape
-        if 'Mmyo' in key:
+        if 'Mmyo' in key: # Not for PM, unsure about other datasets
             value = value*255
         data[key] = value.reshape(number, height, width, input_shape[2])
 
@@ -529,7 +532,7 @@ def default(o):
     raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
 
 
-def pred_patient_set(model_path, test_set, model_name='Test_model', save_path=None):
+def pred_patient_set(model_path, test_set, model_name='Test_model', save_path=None, thr=0.5):
     '''
     This function is used to test an already trained unet model on sets of images from test patients.
     Model and weights are loaded from the model path provided.
@@ -565,7 +568,7 @@ def pred_patient_set(model_path, test_set, model_name='Test_model', save_path=No
     )
     PMet = {}
     for patient_number, patient_id in enumerate(test_set.keys()):
-        print(f"Predicting with {model_name} on {patient_id}")
+        print(f"{patient_number+1}:{len(test_set.keys())} Predicting with {model_name} on {patient_id}")
         imgs, masks = test_set[patient_id]
         series_length = len(imgs)
         rows = series_length // 4 + ((series_length % 4) > 0)
@@ -573,7 +576,7 @@ def pred_patient_set(model_path, test_set, model_name='Test_model', save_path=No
 
         # Predict using the generator
         preds = model.predict(imgs, verbose=0)
-        preds = (preds > 0.5).astype(np.uint8)
+        preds = (preds > thr).astype(np.uint8)
     
     
         fig = plt.figure(figsize=(30,rows*10))

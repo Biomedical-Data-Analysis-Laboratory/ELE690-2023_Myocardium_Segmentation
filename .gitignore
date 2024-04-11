@@ -7,3 +7,13 @@
 /.ipynb_checkpoints/
 /.pdbrc
 /git040324.zip
+/PMet_mul_mod_256_PM.p
+/PMet_mul_mod_Pixel max_PM.p
+/PMet_mul_mod_Pixel scale ceil_PM.p
+/PMet_mul_mod_Pixel scale floor_PM.p
+/PMet_mul_mod_Pixel scale_PM.p
+/PMet_res_mod_256_PM.p
+/PMet_res_mod_Pixel max_PM.p
+/PMet_res_mod_Pixel scale ceil_PM.p
+/PMet_res_mod_Pixel scale floor_PM.p
+/PMet_res_mod_Pixel scale_PM.p
